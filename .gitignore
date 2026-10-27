@@ -9,3 +9,6 @@ datasets/*.csv
 .pytest_cache/
 datasets/*.csv
 .pytest_cache/
+*.backup-*
+scm_before_migration.sql
+scm_before_repair.sql

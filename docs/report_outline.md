@@ -1,45 +1,59 @@
-# Project Report Outline
+# Project Report Outline — DBMS Project Work
 
-## 1. Abstract
+Use the exact order below when preparing the final report. The official project-plan and submission-notice PDFs must be checked by the team before submission; they were not attached to this audit session. Do not insert invented student details, runtime outputs, screenshots, or model metrics.
 
-State that the project delivers a PostgreSQL-centered procure-to-pay system covering requisition, approval, PO, receipt, invoice matching, payment, supplier performance, forecasting, and guarded GenAI access.
+## 1. Title Page
+Use the institution/template supplied by the course. Project: **Supply Chain & Procurement Management System**; Team: **E10 SchemaSquad**; Institution: **Motilal Nehru National Institute of Technology Allahabad, Prayagraj**; Course: **DBMS Project Work**; Academic year: **2026–2027**. Copy student names and registration numbers exactly from the supplied team materials.
 
-## 2. Problem statement and objectives
+## 2. Abstract
+Summarize the verified procurement workflow, PostgreSQL data model, SQL business rules, UI/backend, and only those ML/AI features demonstrated in a real run.
 
-Explain fragmented procurement records, poor stock visibility, invoice mismatch risk, and supplier uncertainty. List objectives: normalized central data, database-enforced rules, role-based access, transparent SQL UI, predictive delivery/forecast features, and approval-safe AI.
+## 3. Introduction and Problem Statement
+Explain fragmented procurement data, inventory visibility, approval traceability, receipt discrepancies, invoice/payment matching, and supplier evaluation.
 
-## 3. Requirements and architecture
+## 4. Project Objectives and Scope
+List core procure-to-pay goals, database constraints, reports, role-based access, SQL transparency and the ML task. Separate implemented scope from future scope.
 
-Include functional/non-functional requirements, architecture diagram, Docker services, and why raw SQL is surfaced in the UI.
+## 5. System Analysis and Requirements
+Include functional and non-functional requirements, user roles, data flow, assumptions, scope boundaries, dependencies and acceptance criteria.
 
-## 4. Data design
+## 6. ER/EER Diagram and Database Schema
+Insert `docs/er_diagram.svg` or a regenerated editable equivalent, describe entities/relationships/cardinalities, then show relation schemas with PK/FK labels. Explain associative entities such as `supplier_product`, `inventory`, `requisition_item` and `po_item`.
 
-Include the ER diagram, entity descriptions, keys, FKs, and the full normalization walkthrough from `normalization.md`.
+## 7. Keys, Functional Dependencies and Normalization
+Use `docs/normalization.md`. Include candidate-key and FK tables, the `PO_SHEET` FDs, 1NF → 2NF → 3NF decomposition, BCNF discussion, and clearly separate hypothetical dependencies from actual constraints.
 
-## 5. Database implementation
+## 8. SQL Implementation (DDL, DML, Joins, Subqueries, etc.)
+Show selected real SQL from `db/01_schema.sql` and `db/demo/08_queries.sql`: DDL, CRUD DML, joins, grouping/HAVING, nested/correlated queries, EXISTS/NOT EXISTS, CTEs, window functions and date/spend queries. Provide actual output snippets.
 
-Describe schema, indexes, five views, triggers, procedures, role grants, and the 3,000-PO / 20,000-movement deterministic seed set. Include selected `EXPLAIN ANALYZE` evidence before and after indexing.
+## 9. Views, Indexes, Triggers and Transactions Implemented
+Describe all five views, representative indexes, business-rule triggers, procedures and role grants. Include `EXPLAIN ANALYZE` outputs and transaction/concurrency observations only after running them.
 
-## 6. Transaction management and security
+## 10. Front-End Design and Database Connectivity
+Show React/FastAPI/PostgreSQL architecture. Explain parameterized raw SQL, transaction boundaries, JWT claims, database-role mapping, CORS, loading/error handling and the SQL panel's actual execution metadata. Add genuine screenshots.
 
-Show the atomic receipt rollback, check-constraint rejection, `FOR UPDATE` fix for concurrent stock issue, isolation-level demonstration, deadlock pattern/fix, and application roles.
+## 11. CRUD Operations and Report Generation
+Demonstrate insert/search/update/delete where safe, workflow actions for historical/financial entities, reporting filters, and export only if it was actually verified.
 
-## 7. Application implementation
+## 12. AI/ML Implementation and Model Evaluation
+Document dataset source and counts, target definition, temporal split, leakage prevention, preprocessing, baseline and compared model, accuracy/precision/recall/F1/ROC-AUC/confusion matrix where applicable, and actual saved metrics. For forecasting, report the naive baseline and actual MAE/MAPE only after training. Include prediction API/UI evidence.
 
-Cover FastAPI, raw SQL response metadata, JWT role mapping, React pages, SQL panel, and schema browser. Add screenshots from the running UI.
+## 13. Testing, Results and Screenshots
+Use a test table with command, scenario, expected result, actual result, pass/fail and evidence filename. Include DB integrity, role denial, receipt boundary, invoice/payment, rollback/concurrency, API tests, frontend build and end-to-end workflow. Mark environment-blocked tests as pending.
 
-## 8. ML implementation and results
+## 14. Conclusion and Future Scope
+Summarize verified outcomes and limitations. Future work may include deployment hardening, richer forecasts, document ingestion formats and model monitoring, but do not present these as completed features.
 
-Describe the chronological split, leakage prevention, features, model comparison, classifier metrics, demand baseline versus model MAE/MAPE, and UI integration. Insert generated metrics after training.
+## 15. References/Bibliography
+Cite PostgreSQL, FastAPI, React/Vite, scikit-learn and any external dataset or policy material actually used. Record dataset versions/licences and access dates. Do not add references that were not consulted.
 
-## 9. GenAI implementation and safety
+## Evidence still needed after a real run
 
-Document Groq via the OpenAI-compatible client, whitelisted text-to-SQL validation, `nl_readonly`, forced limits/timeouts, prompt-injection tests, tool logging, draft-only agent writes, `LISTEN/NOTIFY` worker, and pgvector RAG.
-
-## 10. Testing, limitations, and future work
-
-Include automated guardrail tests and manual database scenario tests. Note that production needs secrets management, managed Postgres, migrations, authentication hardening, observability, and model monitoring.
-
-## 11. Conclusion
-
-Summarize how database rules remain authoritative even when the UI and AI layers are present.
+- [ ] Official title-page/template and exact team registration details.
+- [ ] Actual database table counts and five-view outputs.
+- [ ] Output for successful and rejected workflow scenarios.
+- [ ] Trigger/procedure and role-denial evidence.
+- [ ] Transaction/concurrency results from separate sessions.
+- [ ] Frontend screenshots showing real SQL and returned data.
+- [ ] ML metric JSON, confusion matrix/plots, prediction response and UI screenshot.
+- [ ] Actual test summary and frontend build output.

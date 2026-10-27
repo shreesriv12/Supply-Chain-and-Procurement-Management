@@ -3,7 +3,7 @@
 Usage: python backend/seed/generate_seed.py --output db/07_seed.sql
 """
 from __future__ import annotations
-import argparse, hashlib, random
+import argparse, hashlib, random, secrets
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -20,6 +20,14 @@ def q(value: object) -> str:
 def insert(lines: list[str], table: str, cols: tuple[str, ...], values: tuple[object, ...]) -> None:
     lines.append(f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({', '.join(q(v) for v in values)});")
 
+
+
+def seeded_password_hash(password: str) -> str:
+    salt = secrets.token_bytes(16)
+    iterations = 600_000
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
+    return f"pbkdf2_sha256${iterations}${salt.hex()}${digest.hex()}"
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", default="db/07_seed.sql")
@@ -32,7 +40,7 @@ def main() -> None:
     for i in range(25):
         role = roles[i % len(roles)]
         insert(lines, "employee", ("name", "email", "password_hash", "role", "dept_id", "approval_limit"),
-               (f"Employee {i+1}", f"employee{i+1}@schemasquad.test", hashlib.sha256(b"demo-password").hexdigest(), role, i % 8 + 1, 500000 if role in ("admin", "procurement_mgr") else 0))
+               (f"Employee {i+1}", f"employee{i+1}@schemasquad.test", seeded_password_hash("demo-password"), role, i % 8 + 1, 999999999 if role in ("admin", "procurement_mgr") else 0))
     cities = ["Mumbai", "Pune", "Delhi", "Bengaluru", "Chennai", "Ahmedabad", "Hyderabad", "Kolkata"]
     reliability = []
     for i in range(40):
@@ -58,20 +66,20 @@ def main() -> None:
     # The generated POs carry learnable late-delivery signal: supplier reliability, lead time and value.
     start = TODAY - timedelta(days=730)
     for po in range(1, args.po_count + 1):
-        supplier = R.randint(1, 39); warehouse = R.randint(1, 5); created = (po % 5) + 1
+        supplier = R.randint(1, 39); warehouse = R.randint(1, 5); created = (po % 5) + 1; approver = 2 if created == 1 else 1
         ordered = start + timedelta(days=R.randint(0, 729)); lead = R.randint(5, 25); expected = ordered + timedelta(days=lead)
         late = R.random() > reliability[supplier-1] - min(0.18, lead / 200)
         delivered = expected + timedelta(days=R.randint(1, 12) if late else -R.randint(0, 3))
-        total = 0.0; items = R.randint(2, 4); receipt_lines = []
-        insert(lines, "purchase_requisition", ("requested_by", "dept_id", "status", "approved_by", "source", "created_at"), (created, created % 8 + 1, "CONVERTED", 1, "MANUAL", ordered))
-        insert(lines, "purchase_order", ("req_id", "supplier_id", "warehouse_id", "created_by", "approved_by", "order_date", "expected_date", "delivered_date", "status", "total_amount"), (po, supplier, warehouse, created, 1, ordered, expected, delivered, "SENT", 0))
-        for line in range(1, items + 1):
-            product = R.randint(1, 250); qty = R.randint(5, 80); price = round(R.uniform(80, 4000), 2); total += qty * price
+        total = 0.0; items = R.randint(2, 4); receipt_lines = []; products = R.sample(range(1, 251), items)
+        insert(lines, "purchase_requisition", ("requested_by", "dept_id", "status", "approved_by", "source", "created_at"), (created, created % 8 + 1, "CONVERTED", approver, "MANUAL", ordered))
+        insert(lines, "purchase_order", ("req_id", "supplier_id", "warehouse_id", "created_by", "approved_by", "order_date", "expected_date", "delivered_date", "status", "total_amount"), (po, supplier, warehouse, created, approver, ordered, expected, delivered, "DRAFT", 0))
+        for line, product in enumerate(products, start=1):
+            qty = R.randint(5, 80); price = round(R.uniform(80, 4000), 2); total += qty * price
             receipt_lines.append(qty)
             insert(lines, "requisition_item", ("req_id", "product_id", "qty"), (po, product, qty))
             # GRN insert triggers increment qty_received; start at zero to avoid double counting.
             insert(lines, "po_item", ("po_id", "line_no", "product_id", "qty_ordered", "qty_received", "unit_price"), (po, line, product, qty, 0, price))
-        lines.append(f"UPDATE purchase_order SET total_amount = {total:.2f} WHERE po_id = {po};")
+        lines.append(f"UPDATE purchase_order SET total_amount = {total:.2f}, status = 'SENT' WHERE po_id = {po};")
         insert(lines, "goods_receipt", ("po_id", "warehouse_id", "received_by", "received_date"), (po, warehouse, 3, delivered))
         for line, qty in enumerate(receipt_lines, 1): insert(lines, "grn_item", ("grn_id", "line_no", "po_id", "po_line_no", "qty_received", "qty_rejected"), (po, line, po, line, qty, 0))
         status = "PAID" if po % 5 else "PENDING"
@@ -85,7 +93,11 @@ def main() -> None:
         moved = start + timedelta(days=R.randint(0, 729))
         insert(lines, "stock_movement", ("warehouse_id", "product_id", "movement_type", "qty", "moved_at", "ref_type", "ref_id"), (wid, pid, "OUT" if n % 3 else "IN", R.randint(1, 30), moved, "SEED", n+1))
     # Deliberate 3-way-match edge case; trigger implementation arrives in Phase 2.
-    insert(lines, "invoice", ("po_id", "supplier_id", "invoice_no", "invoice_date", "due_date", "amount", "status"), (1, 1, "INV-EDGE-DISPUTED", TODAY, TODAY + timedelta(days=30), 999999.99, "DISPUTED"))
+    lines.append(
+        f"INSERT INTO invoice (po_id, supplier_id, invoice_no, invoice_date, due_date, amount, status) "
+        f"SELECT 1, supplier_id, 'INV-EDGE-DISPUTED', {q(TODAY)}, {q(TODAY + timedelta(days=30))}, 999999.99, 'DISPUTED' "
+        f"FROM purchase_order WHERE po_id = 1;"
+    )
     lines.extend(["COMMIT;", "ANALYZE;"])
     output = Path(args.output); output.parent.mkdir(parents=True, exist_ok=True); output.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"Wrote {output} with {args.po_count} POs and 20,000 stock movements.")
