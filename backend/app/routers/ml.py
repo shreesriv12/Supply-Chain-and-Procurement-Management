@@ -14,7 +14,7 @@ router = APIRouter(prefix="/ml", tags=["machine learning"])
 # delivery/evaluation not available strictly before the target PO's order date.
 LATE_FEATURE_SQL = """
 SELECT
-    hs.prior_supplier_rating AS supplier_rating,
+    s.rating AS supplier_rating,
     hs.prior_on_time_rate,
     po.expected_date - po.order_date AS planned_lead_time,
     po.total_amount,
@@ -24,6 +24,7 @@ SELECT
     MIN(c.name) AS category,
     w.city AS warehouse_city
 FROM purchase_order AS po
+JOIN supplier AS s USING (supplier_id)
 JOIN warehouse AS w USING (warehouse_id)
 JOIN po_item AS pi USING (po_id)
 JOIN product AS p USING (product_id)
@@ -31,8 +32,7 @@ JOIN category AS c USING (category_id)
 LEFT JOIN LATERAL (
     SELECT
         AVG(CASE WHEN old.delivered_date <= old.expected_date THEN 1.0 ELSE 0.0 END)
-            AS prior_on_time_rate,
-        AVG(se.quality_score) AS prior_supplier_rating
+            AS prior_on_time_rate
     FROM purchase_order AS old
     LEFT JOIN supplier_evaluation AS se
         ON se.po_id = old.po_id
@@ -44,7 +44,7 @@ LEFT JOIN LATERAL (
 ) AS hs ON TRUE
 WHERE po.po_id = %s
 GROUP BY
-    po.po_id, hs.prior_supplier_rating, hs.prior_on_time_rate,
+    po.po_id, s.rating, hs.prior_on_time_rate,
     po.expected_date, po.order_date, po.total_amount, w.city
 """
 

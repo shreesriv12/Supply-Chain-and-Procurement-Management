@@ -32,7 +32,7 @@ SELECT
     po.po_id,
     po.order_date,
     (po.delivered_date > po.expected_date)::int AS late,
-    hs.prior_supplier_rating AS supplier_rating,
+    s.rating AS supplier_rating,
     hs.prior_on_time_rate,
     po.expected_date - po.order_date AS planned_lead_time,
     po.total_amount,
@@ -42,6 +42,7 @@ SELECT
     MIN(c.name) AS category,
     w.city AS warehouse_city
 FROM purchase_order AS po
+JOIN supplier AS s USING (supplier_id)
 JOIN warehouse AS w USING (warehouse_id)
 JOIN po_item AS pi USING (po_id)
 JOIN product AS p USING (product_id)
@@ -49,8 +50,7 @@ JOIN category AS c USING (category_id)
 LEFT JOIN LATERAL (
     SELECT
         AVG(CASE WHEN old.delivered_date <= old.expected_date THEN 1.0 ELSE 0.0 END)
-            AS prior_on_time_rate,
-        AVG(se.quality_score) AS prior_supplier_rating
+            AS prior_on_time_rate
     FROM purchase_order AS old
     LEFT JOIN supplier_evaluation AS se
         ON se.po_id = old.po_id
@@ -63,7 +63,7 @@ LEFT JOIN LATERAL (
 WHERE po.delivered_date IS NOT NULL
 GROUP BY
     po.po_id, po.order_date, po.delivered_date, po.expected_date,
-    hs.prior_supplier_rating, hs.prior_on_time_rate,
+    s.rating, hs.prior_on_time_rate,
     po.total_amount, w.city
 ORDER BY po.order_date, po.po_id
 """
@@ -195,7 +195,7 @@ def main() -> None:
         "feature_notes": [
             "One row per PO; category is MIN(category.name) to align training and inference.",
             "Supplier history includes only completed deliveries before the PO order date.",
-            "Historical quality rating uses evaluations recorded before the PO order date.",
+            "Supplier rating is read from the supplier master, rather than from optional historical evaluation rows.",
         ],
         "candidates": {
             name: {key: value for key, value in values.items() if key != "pipeline"}

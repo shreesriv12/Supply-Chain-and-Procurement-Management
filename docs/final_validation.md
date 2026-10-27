@@ -104,6 +104,35 @@ Invoke-RestMethod http://localhost:8000/health
 
 Open `http://localhost:5173`, sign in with a seeded employee, and visibly capture the actual SQL panel while creating a requisition, approving it, creating/approving a PO, receiving goods, and paying a correctly matched invoice. Also capture one rejected over-receipt or unauthorized operation.
 
+## Recorded validation evidence (2026-10-27)
+
+The following checks were executed against the existing Docker database and services. They did not reset, truncate, reseed, or otherwise recreate the PostgreSQL volume.
+
+| Check | Command / method | Actual result | Status |
+|---|---|---|---|
+| Containers | `docker compose ps` | `db` healthy; `api`, `web`, and `worker` running | PASS |
+| API health | `Invoke-RestMethod http://localhost:8000/health` | `{ "status": "ok" }` | PASS |
+| Frontend reachability | `Invoke-WebRequest http://localhost:5173` | HTTP 200 | PASS |
+| ER-diagram asset | `Invoke-WebRequest http://localhost:8000/api/schema/er-diagram` | HTTP 200 after packaging the maintained SVG in the API image | PASS |
+| Backend tests | `docker compose exec -T api python -m pytest -q` | `7 passed` (rerun after final ML changes: `7 passed in 0.72s`) | PASS |
+| Python compilation | `docker compose exec -T api python -m compileall -q app` | Completed with exit code 0 and no diagnostics | PASS |
+| Supplier-rating feature source | Read-only SQL over 3,001 delivered POs | 40/40 supplier master ratings populated; 3,001/3,001 labelled POs have a populated joined rating | PASS |
+| Late-delivery training | `docker compose exec -T api python -m app.ml.train_late` | Logistic regression selected; 2,400 chronological-train rows, 601 test rows, ROC-AUC 0.7099 | PASS |
+| Forecast training | `docker compose exec -T api python -m app.ml.train_forecast` | 4,216 train rows, 965 test rows, MAE 20.89 versus naive MAE 28.40 | PASS |
+| ML API smoke test | Authenticated `POST /api/ml/predict/late/3002`, `GET /api/ml/forecast/reorder` | One logistic-regression prediction persisted (late probability 0.6226); 1,250 reorder rows returned | PASS |
+| PO self-approval control | Rollback-only direct SQL attempt for PO 3002 | Rejected: `Purchase-order creator 2 cannot approve their own PO` | PASS |
+| Role denial | Rollback-only `SET LOCAL ROLE app_viewer; DELETE FROM supplier ...` | Rejected: `permission denied for table supplier` | PASS |
+
+### ML metrics and interpretation
+
+The selected late classifier is logistic regression. On the chronological holdout it achieved accuracy 0.6689, precision 0.6319, recall 0.6618, F1 0.6465, and ROC-AUC 0.7099. Its confusion matrix, with rows `[actual non-late, actual late]` and columns `[predicted non-late, predicted late]`, is `[[220, 106], [93, 182]]`.
+
+The forecast model MAE is 20.89, compared with the lag-1 baseline MAE of 28.40. Percentage error is reported only for positive-demand test rows because standard MAPE is undefined for zero-demand observations; 76 of the 965 held-out rows had zero demand. The positive-demand MAPE was 1.3164 for the model and 1.5679 for the baseline. This metric is supplementary; MAE is the principal comparison because zero demand is valid in inventory history.
+
+### Known verification boundary
+
+The interactive browser workflow still needs screenshots captured manually for the academic report: login, product/supplier CRUD, a generated report with the SQL panel open, ER-diagram link, workflow pages, and one rejected action. The new frontend code was built into the running `web` container, but the individual visual steps were not automated in this validation run.
+
 ## 9. Existing DB recovery
 
 For a failed migration, keep the volume. Save the complete `psql` error, fix the migration, and re-run it after confirming the script is transactional and idempotent. If the database is not usable, back it up first with `pg_dump` before attempting recovery. Any destructive reset requires explicit team approval and a known backup.

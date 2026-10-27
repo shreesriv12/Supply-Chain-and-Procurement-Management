@@ -13,3 +13,7 @@ def create_product(item: ProductIn, user: dict = Depends(current_user)):
 @router.put("/{product_id}")
 def update_product(product_id: int, item: ProductIn, user: dict = Depends(current_user)):
     return run_sql("UPDATE product SET sku=%s,name=%s,category_id=%s,unit=%s,std_cost=%s WHERE product_id=%s RETURNING *", [*item.model_dump().values(), product_id], app_role=user["role"])
+
+@router.delete("/{product_id}")
+def delete_product(product_id: int, user: dict = Depends(current_user)):
+    return run_sql("DELETE FROM product WHERE product_id=%s RETURNING product_id, name", [product_id], app_role=user["role"])

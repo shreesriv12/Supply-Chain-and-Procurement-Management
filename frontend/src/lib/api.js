@@ -1,4 +1,4 @@
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+export const API = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 export const auth = {
   get: () => JSON.parse(localStorage.getItem('scm_auth') || 'null'),
   set: (value) => localStorage.setItem('scm_auth', JSON.stringify(value)),

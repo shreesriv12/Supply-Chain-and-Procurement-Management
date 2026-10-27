@@ -17,19 +17,25 @@ services:
       retries: 12
 
   api:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-scm_admin}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in the project-root .env file}@db:5432/${POSTGRES_DB:-scm}
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in the project-root .env file}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
     ports:
       - "8000:8000"
+    volumes:
+      - ml_models:/app/app/ml/models
     depends_on:
       db:
         condition: service_healthy
 
   worker:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     command: python -m app.ai.worker
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-scm_admin}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in the project-root .env file}@db:5432/${POSTGRES_DB:-scm}
@@ -38,6 +44,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - ml_models:/app/app/ml/models
 
   web:
     build: ./frontend
@@ -48,3 +56,4 @@ services:
 
 volumes:
   postgres_data:
+  ml_models:

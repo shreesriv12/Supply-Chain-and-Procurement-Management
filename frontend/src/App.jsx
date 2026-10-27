@@ -10,16 +10,16 @@ import MlInsights from './pages/MlInsights';
 import AskData from './pages/AskData';
 import Agent from './pages/Agent';
 import PolicyQa from './pages/PolicyQa';
+import Reports from './pages/Reports';
 
 const config = {
-  suppliers: ['Suppliers', 'Supplier directory and performance-ready master data.', '/suppliers', ['supplier_id','name','city','status','rating','email']],
-  products: ['Products & categories', 'Product master, SKU catalogue and category classification.', '/products', ['product_id','sku','name','category_name','unit','std_cost']],
+  suppliers: ['Suppliers', 'Supplier directory and performance-ready master data.', '/suppliers', ['supplier_id','name','city','status','rating','email'], { id: 'supplier_id', label: 'name', labelPlural: 'suppliers', searchable: true, fields: [{ name: 'name', label: 'Supplier name', required: true }, { name: 'gstin', label: 'GSTIN' }, { name: 'email', label: 'Email', type: 'email' }, { name: 'phone', label: 'Phone' }, { name: 'city', label: 'City' }, { name: 'country', label: 'Country', default: 'India' }, { name: 'rating', label: 'Rating (0-5)', type: 'number', step: '0.1' }] }],
+  products: ['Products & categories', 'Product master, SKU catalogue and category classification.', '/products', ['product_id','sku','name','category_name','unit','std_cost'], { id: 'product_id', label: 'name', labelPlural: 'products', searchable: true, fields: [{ name: 'sku', label: 'SKU', required: true }, { name: 'name', label: 'Product name', required: true }, { name: 'category_id', label: 'Category ID', type: 'number', required: true }, { name: 'unit', label: 'Unit', default: 'pcs' }, { name: 'std_cost', label: 'Standard cost', type: 'number', step: '0.01', required: true }] }],
   inventory: ['Inventory', 'Stock by warehouse, including reorder thresholds.', '/inventory', ['warehouse_name','sku','product_name','qty_on_hand','reorder_level','reorder_qty']],
   requisitions: ['Requisitions', 'Create, approve and convert procurement demand into POs.', '/requisitions', ['req_id','requested_by_name','status','source','created_at']],
   orders: ['Purchase orders', 'Approved ordering workflow, supplier status and delivery progress.', '/orders', ['po_id','supplier_name','warehouse_name','order_date','status','total_amount','total_received_qty']],
   receipts: ['Goods receipts', 'Receive goods against approved purchase orders.', '/orders', ['po_id','supplier_name','status','total_ordered_qty','total_received_qty']],
   invoices: ['Invoices & payments', 'Three-way match state and outstanding payment balance.', '/invoices', ['invoice_id','invoice_no','supplier_name','due_date','invoice_amount','paid_amount','outstanding_amount','status']],
-  reports: ['Reports', 'Spend by category and month.', '/reports/spend', ['month','category_name','spend','po_count']]
 };
 export default function App() {
   const [session, setSession] = useState(auth.get()); const [page, setPage] = useState('dashboard'); const [lastQuery, setLastQuery] = useState(null);
@@ -30,7 +30,8 @@ export default function App() {
   else if (page === 'ask') content = <AskData onQuery={setLastQuery} />;
   else if (page === 'assistant') content = <Agent onQuery={setLastQuery} />;
   else if (page === 'policy') content = <PolicyQa onQuery={setLastQuery} />;
+  else if (page === 'reports') content = <Reports onQuery={setLastQuery} />;
   else if (page === 'schema') content = <Schema onQuery={setLastQuery} />;
-  else { const [title, subtitle, endpoint, columns] = config[page]; content = <DataPage title={title} subtitle={subtitle} endpoint={endpoint} columns={columns} onQuery={setLastQuery} />; }
+  else { const [title, subtitle, endpoint, columns, resource] = config[page]; content = <DataPage title={title} subtitle={subtitle} endpoint={endpoint} columns={columns} resource={resource} onQuery={setLastQuery} />; }
   return <Layout page={page} setPage={setPage} user={session.employee} onLogout={() => { auth.clear(); setSession(null); }}>{content}<SqlPanel lastQuery={lastQuery} /></Layout>;
 }

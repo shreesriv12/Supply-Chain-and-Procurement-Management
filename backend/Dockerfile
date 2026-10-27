@@ -1,8 +1,9 @@
 FROM python:3.11-slim
 WORKDIR /app
 ENV PYTHONPATH=/app
-COPY requirements.txt .
+COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
-COPY app ./app
-COPY tests ./tests
+COPY backend/app ./app
+COPY backend/tests ./tests
+COPY docs/er_diagram.svg ./docs/er_diagram.svg
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

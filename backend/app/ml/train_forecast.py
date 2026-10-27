@@ -31,6 +31,7 @@ def main() -> None:
     cutoff = frame.month.quantile(1-args.test_fraction); train, test = frame[frame.month <= cutoff], frame[frame.month > cutoff]
     model = HistGradientBoostingRegressor(max_iter=200, learning_rate=.08, max_leaf_nodes=20, random_state=42).fit(train[FEATURES], train.demand)
     predicted, baseline = np.maximum(0, model.predict(test[FEATURES])), test.lag_1
-    metrics = {"train_rows": len(train), "test_rows": len(test), "mae": float(mean_absolute_error(test.demand, predicted)), "mape": float(mean_absolute_percentage_error(test.demand, np.maximum(1, predicted))), "naive_mae": float(mean_absolute_error(test.demand, baseline)), "naive_mape": float(mean_absolute_percentage_error(test.demand, np.maximum(1, baseline)))}
+    nonzero = test.demand > 0
+    metrics = {"train_rows": len(train), "test_rows": len(test), "mae": float(mean_absolute_error(test.demand, predicted)), "mape_nonzero_actual": float(mean_absolute_percentage_error(test.loc[nonzero, "demand"], np.maximum(1, predicted[nonzero]))) if nonzero.any() else None, "naive_mae": float(mean_absolute_error(test.demand, baseline)), "naive_mape_nonzero_actual": float(mean_absolute_percentage_error(test.loc[nonzero, "demand"], np.maximum(1, baseline[nonzero]))) if nonzero.any() else None, "zero_demand_test_rows": int((~nonzero).sum())}
     MODEL_DIR.mkdir(parents=True, exist_ok=True); joblib.dump({"model": model, "features": FEATURES}, FORECAST_MODEL); save_metrics("demand_forecast", metrics); print(f"Saved {FORECAST_MODEL}; MAE={metrics['mae']:.2f}")
 if __name__ == "__main__": main()
