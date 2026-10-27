@@ -1,0 +1,13 @@
+fastapi==0.115.12
+uvicorn[standard]==0.34.2
+psycopg[binary,pool]==3.2.6
+PyJWT==2.10.1
+pydantic==2.11.3
+pandas==2.2.3
+scikit-learn==1.6.1
+joblib==1.4.2
+openai==1.109.1
+sqlglot==26.16.4
+pypdf==5.4.0
+python-multipart==0.0.20
+pytest==8.3.5

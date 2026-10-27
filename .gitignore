@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.env
+node_modules/
+dist/
+backend/app/ml/models/
+docs/real_dataset_profile.json
+datasets/*.csv
+.pytest_cache/
+datasets/*.csv
+.pytest_cache/
