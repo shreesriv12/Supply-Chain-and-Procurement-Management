@@ -12,3 +12,6 @@ datasets/*.csv
 *.backup-*
 scm_before_migration.sql
 scm_before_repair.sql
+
+.env
+.env.local

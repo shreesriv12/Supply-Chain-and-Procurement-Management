@@ -1,0 +1,14 @@
+*   [33m7315500[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mclean-main[m[33m)[m Merge branch 'main' of https://github.com/shreesriv12/Supply-Chain-and-Procurement-Management into clean-main
+[31m|[m[32m\[m  
+[31m|[m *   [33mf4a958e[m[33m ([m[1;31morigin/main[m[33m)[m Merge pull request #1 from shreesriv12/clean-main
+[31m|[m [33m|[m[34m\[m  
+* [33m|[m [34m|[m [33m417a183[m added frontend crud controls
+[34m|[m [33m|[m[34m/[m  
+[34m|[m[34m/[m[33m|[m   
+* [33m|[m [33m3ba822e[m[33m ([m[1;31morigin/clean-main[m[33m)[m Harden procurement workflows and complete validation
+[33m|[m[33m/[m  
+* [33mb34bf25[m Initial clean project commit
+* [33m873704a[m[33m ([m[1;32mmain[m[33m, [m[1;32mbackup-before-cleanup[m[33m)[m fix schema
+* [33m908db5b[m sql integration
+* [33m8c16820[m feat: add real dataset training and hybrid ML evaluation pipeline
+* [33me9a635f[m feat: build foundation of  end-to-end supply chain procurement management system
