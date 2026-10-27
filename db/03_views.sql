@@ -1,4 +1,3 @@
-sql
 -- Supply Chain and Procurement Management
 -- Reporting views
 

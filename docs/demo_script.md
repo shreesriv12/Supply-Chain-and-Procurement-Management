@@ -1,30 +1,33 @@
-# Viva Demonstration Script
+# Viva Demonstration Script (8–10 minutes)
 
-## Preparation
+**Evidence rule:** capture outputs from the live environment. If a step fails, show the failure honestly and explain the blocker; do not use a mock screenshot as execution evidence.
 
-1. Set `GROQ_API_KEY` in a local environment file or shell.
-2. Run `python backend/seed/generate_seed.py`.
-3. Start the stack: `docker compose up --build`.
-4. Train both models from the API container.
-5. Sign in at `http://localhost:5173` with `employee1@schemasquad.test` and `demo-password`.
+## Before the demo
 
-## Eight-minute flow
+1. Confirm `.env` contains a non-committed `JWT_SECRET`; set `GROQ_API_KEY` only if showing GenAI.
+2. Start with `docker compose up -d --build`, verify `docker compose ps` and `Invoke-RestMethod http://localhost:8000/health`.
+3. Apply `db/10_fixes.sql` manually if the database volume existed before the migration file was added.
+4. Run the ML training command if the model artifacts are missing and save actual metrics.
+5. Sign in at `http://localhost:5173` with a seeded employee account. The generated seed currently uses `employee<N>@schemasquad.test` and demo password `demo-password`; replace demo identities before deployment.
 
-1. **Architecture (30 seconds):** show Docker services and explain that PostgreSQL owns business rules while the UI shows the SQL generated for each operation.
-2. **Data model (60 seconds):** open Schema & ER. Explain the supplier-product and warehouse-product many-to-many relations, then show the live table/column browser.
-3. **Inventory rule (60 seconds):** open Inventory and Low Stock. Explain the non-negative CHECK, low-stock trigger, auto requisition, and notification.
-4. **Procurement flow (90 seconds):** show a requisition, approval, created PO, and the PO lines. Explain the approved-requisition and approval-limit rules.
-5. **Receipt and invoice (90 seconds):** receive against a PO. Show that the GRN trigger updates `po_item`, inventory, stock movement, and PO status. Show matched versus disputed invoices and explain the 2% three-way-match tolerance.
-6. **SQL panel (30 seconds):** perform any refresh/action and point out parameterized SQL, parameter values, duration, rows affected, and raw result.
-7. **ML (60 seconds):** open ML insights, predict a PO's late-delivery risk, then show reorder recommendations. Explain time split and no leakage.
-8. **GenAI safety (90 seconds):** ask a reporting question in Ask Data, edit the displayed SQL, and explain why destructive SQL is rejected. Run Procurement Agent, show `AWAITING_APPROVAL`, the draft PO ID, and the tool log. Optionally upload a text policy and ask a cited question.
+## Live sequence
 
-## Suggested viva questions
+1. **Architecture (30 sec):** show the React frontend, FastAPI backend, PostgreSQL/pgvector and optional ML/GenAI modules. Emphasize that DB constraints—not only React—protect business rules.
+2. **Schema and normalization (60 sec):** show the ER/schema browser. Explain composite keys on inventory, supplier-product and PO lines; distinguish the illustrative `PO_SHEET` key from actual `(po_id, line_no)`.
+3. **Report and SQL panel (45 sec):** open low-stock or supplier-performance reporting. Point to the exact SQL, bound parameters, duration, affected rows and returned data for a real request.
+4. **Requisition and approval (90 sec):** create a requisition with multiple items, show the transaction result, approve as a manager, then create and approve the PO. Explain approval limits and why direct unauthorized approval should be rejected.
+5. **Receiving and inventory (90 sec):** receive goods against an approved/sent PO. Show the GRN line, inventory quantity, stock movement and PO status. Try one receipt over the documented 105% limit; capture the actual database rejection. Use a stable `ref_no` for a retry/idempotency example.
+6. **Invoice/payment (60 sec):** show a matched invoice with an accepted receipt and a disputed invoice that fails matching. Demonstrate that an unmatched invoice and an overpayment are rejected.
+7. **ML prediction (60 sec):** show the model name, probability/prediction response and saved metric JSON. Explain the time-based split and avoiding supplier-history leakage. State actual metrics only.
+8. **AI safety (optional, 60–90 sec):** ask Ask Data for a reporting query. Show a rejected write statement and restricted role. Run the agent and verify it creates a draft that awaits manager approval; do not claim the agent sent/approved an order.
+9. **Wrap-up (20 sec):** state verified strengths and any remaining limitations.
 
-**Why are constraints/triggers preferable to application-only validation?** Every client, including scripts, API, and AI agent, must obey the same rules at the database boundary.
+## Viva prompts
 
-**How is the lost-update problem handled?** The transaction demo contrasts unprotected read-modify-write with `SELECT ... FOR UPDATE`, which serializes access to the inventory row.
-
-**How does text-to-SQL avoid destructive access?** The model output is parsed with sqlglot, must be a single SELECT against named reporting views, receives a forced limit and timeout, and executes through the `nl_readonly` role.
-
-**Why are agent writes drafts only?** The agent can recommend and create a DRAFT PO, but cannot approve/send it. A human manager completes the irreversible business action.
+- Why must business rules live in PostgreSQL as well as in the UI?
+- What is the difference between a primary key and a candidate key?
+- Which functional dependencies cause partial/transitive dependencies in `PO_SHEET`?
+- How does `SELECT ... FOR UPDATE` prevent competing stock issues from both consuming the same balance?
+- Why do invoice matching and payment insertion need transactional checks and row locks?
+- Why is a time-based split more appropriate than a random split for historical delivery predictions?
+- Why is the AI agent limited to draft purchase orders?

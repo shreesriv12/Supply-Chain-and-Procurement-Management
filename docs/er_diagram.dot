@@ -1,0 +1,74 @@
+digraph SCM_ER {
+  graph [rankdir=LR, bgcolor="white", pad="0.25", nodesep="0.35", ranksep="0.75", splines=polyline, fontname="Arial", label="Supply Chain & Procurement Management — relational ER overview", labelloc=t, fontsize=22];
+  node [shape=plain, fontname="Arial", fontsize=10];
+  edge [color="#64748b", penwidth=1.0, arrowsize=0.65, fontname="Arial", fontsize=8];
+
+  subgraph cluster_master {
+    label="Master data"; color="#cbd5e1"; style="rounded";
+    department [label=< <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5"><TR><TD BGCOLOR="#dbeafe"><B>department</B></TD></TR><TR><TD ALIGN="LEFT"><B>PK</B> dept_id</TD></TR><TR><TD ALIGN="LEFT">name (UNIQUE), budget</TD></TR></TABLE> >];
+    employee [label=< <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5"><TR><TD BGCOLOR="#dbeafe"><B>employee</B></TD></TR><TR><TD ALIGN="LEFT"><B>PK</B> emp_id</TD></TR><TR><TD ALIGN="LEFT"><B>FK</B> dept_id</TD></TR><TR><TD ALIGN="LEFT">email (UNIQUE), role, approval_limit</TD></TR></TABLE> >];
+    supplier [label=< <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5"><TR><TD BGCOLOR="#dbeafe"><B>supplier</B></TD></TR><TR><TD ALIGN="LEFT"><B>PK</B> supplier_id</TD></TR><TR><TD ALIGN="LEFT">gstin (UNIQUE), status, rating</TD></TR></TABLE> >];
+    supplier_contact [label=< <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5"><TR><TD BGCOLOR="#dbeafe"><B>supplier_contact</B></TD></TR><TR><TD ALIGN="LEFT"><B>PK</B> contact_id</TD></TR><TR><TD ALIGN="LEFT"><B>FK</B> supplier_id</TD></TR></TABLE> >];
+    category [label=< <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5"><TR><TD BGCOLOR="#dbeafe"><B>category</B></TD></TR><TR><TD ALIGN="LEFT"><B>PK</B> category_id</TD></TR><TR><TD ALIGN="LEFT"><B>FK</B> parent_id (self-reference)</TD></TR></TABLE> >];
+    product [label=< <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5"><TR><TD BGCOLOR="#dbeafe"><B>product</B></TD></TR><TR><TD ALIGN="LEFT"><B>PK</B> product_id</TD></TR><TR><TD ALIGN="LEFT"><B>FK</B> category_id</TD></TR><TR><TD ALIGN="LEFT">sku (UNIQUE), std_cost</TD></TR></TABLE> >];
+    supplier_product [label=< <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5"><TR><TD BGCOLOR="#dbeafe"><B>supplier_product</B></TD></TR><TR><TD ALIGN="LEFT"><B>PK/FK</B> supplier_id</TD></TR><TR><TD ALIGN="LEFT"><B>PK/FK</B> product_id</TD></TR><TR><TD ALIGN="LEFT">unit_price, lead_time_days</TD></TR></TABLE> >];
+    warehouse [label=< <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5"><TR><TD BGCOLOR="#dbeafe"><B>warehouse</B></TD></TR><TR><TD ALIGN="LEFT"><B>PK</B> warehouse_id</TD></TR><TR><TD ALIGN="LEFT">city, capacity</TD></TR></TABLE> >];
+    inventory [label=< <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5"><TR><TD BGCOLOR="#dbeafe"><B>inventory</B></TD></TR><TR><TD ALIGN="LEFT"><B>PK/FK</B> warehouse_id</TD></TR><TR><TD ALIGN="LEFT"><B>PK/FK</B> product_id</TD></TR><TR><TD ALIGN="LEFT">qty_on_hand, reorder_level</TD></TR></TABLE> >];
+  }
+
+  subgraph cluster_procurement {
+    label="Procure-to-pay workflow"; color="#cbd5e1"; style="rounded";
+    purchase_requisition [label=< <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5"><TR><TD BGCOLOR="#dcfce7"><B>purchase_requisition</B></TD></TR><TR><TD ALIGN="LEFT"><B>PK</B> req_id</TD></TR><TR><TD ALIGN="LEFT"><B>FK</B> requested_by, approved_by, dept_id</TD></TR><TR><TD ALIGN="LEFT">status, source</TD></TR></TABLE> >];
+    requisition_item [label=< <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5"><TR><TD BGCOLOR="#dcfce7"><B>requisition_item</B></TD></TR><TR><TD ALIGN="LEFT"><B>PK/FK</B> req_id</TD></TR><TR><TD ALIGN="LEFT"><B>PK/FK</B> product_id</TD></TR><TR><TD ALIGN="LEFT">qty</TD></TR></TABLE> >];
+    purchase_order [label=< <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5"><TR><TD BGCOLOR="#dcfce7"><B>purchase_order</B></TD></TR><TR><TD ALIGN="LEFT"><B>PK</B> po_id</TD></TR><TR><TD ALIGN="LEFT"><B>FK</B> req_id, supplier_id, warehouse_id</TD></TR><TR><TD ALIGN="LEFT"><B>FK</B> created_by, approved_by</TD></TR><TR><TD ALIGN="LEFT">status, dates, total_amount</TD></TR></TABLE> >];
+    po_item [label=< <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5"><TR><TD BGCOLOR="#dcfce7"><B>po_item</B></TD></TR><TR><TD ALIGN="LEFT"><B>PK/FK</B> po_id</TD></TR><TR><TD ALIGN="LEFT"><B>PK</B> line_no</TD></TR><TR><TD ALIGN="LEFT"><B>FK</B> product_id</TD></TR><TR><TD ALIGN="LEFT">qty_ordered, qty_received, unit_price</TD></TR></TABLE> >];
+    goods_receipt [label=< <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5"><TR><TD BGCOLOR="#dcfce7"><B>goods_receipt</B></TD></TR><TR><TD ALIGN="LEFT"><B>PK</B> grn_id</TD></TR><TR><TD ALIGN="LEFT"><B>FK</B> po_id, warehouse_id, received_by</TD></TR><TR><TD ALIGN="LEFT">received_date, ref_no (migration)</TD></TR></TABLE> >];
+    grn_item [label=< <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5"><TR><TD BGCOLOR="#dcfce7"><B>grn_item</B></TD></TR><TR><TD ALIGN="LEFT"><B>PK/FK</B> grn_id</TD></TR><TR><TD ALIGN="LEFT"><B>PK</B> line_no</TD></TR><TR><TD ALIGN="LEFT"><B>FK</B> po_id + po_line_no</TD></TR><TR><TD ALIGN="LEFT">qty_received, qty_rejected</TD></TR></TABLE> >];
+    invoice [label=< <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5"><TR><TD BGCOLOR="#dcfce7"><B>invoice</B></TD></TR><TR><TD ALIGN="LEFT"><B>PK</B> invoice_id</TD></TR><TR><TD ALIGN="LEFT"><B>FK</B> po_id, supplier_id</TD></TR><TR><TD ALIGN="LEFT">UNIQUE (supplier_id, invoice_no)</TD></TR><TR><TD ALIGN="LEFT">amount, status, due_date</TD></TR></TABLE> >];
+    payment [label=< <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5"><TR><TD BGCOLOR="#dcfce7"><B>payment</B></TD></TR><TR><TD ALIGN="LEFT"><B>PK</B> payment_id</TD></TR><TR><TD ALIGN="LEFT"><B>FK</B> invoice_id</TD></TR><TR><TD ALIGN="LEFT">amount, paid_on, method</TD></TR></TABLE> >];
+    supplier_evaluation [label=< <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5"><TR><TD BGCOLOR="#dcfce7"><B>supplier_evaluation</B></TD></TR><TR><TD ALIGN="LEFT"><B>PK</B> eval_id</TD></TR><TR><TD ALIGN="LEFT"><B>FK</B> supplier_id, po_id (UNIQUE)</TD></TR><TR><TD ALIGN="LEFT">on_time, days_late, quality_score</TD></TR></TABLE> >];
+    stock_movement [label=< <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5"><TR><TD BGCOLOR="#dcfce7"><B>stock_movement</B></TD></TR><TR><TD ALIGN="LEFT"><B>PK</B> movement_id</TD></TR><TR><TD ALIGN="LEFT"><B>FK</B> (warehouse_id, product_id)</TD></TR><TR><TD ALIGN="LEFT">movement_type, qty, moved_at</TD></TR></TABLE> >];
+  }
+
+  subgraph cluster_audit_ai {
+    label="Audit, prediction and document support"; color="#cbd5e1"; style="rounded";
+    audit_log [label=< <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5"><TR><TD BGCOLOR="#fef3c7"><B>audit_log</B></TD></TR><TR><TD ALIGN="LEFT"><B>PK</B> log_id</TD></TR><TR><TD ALIGN="LEFT">table_name, record_id, old_data, new_data</TD></TR></TABLE> >];
+    prediction [label=< <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5"><TR><TD BGCOLOR="#fef3c7"><B>prediction</B></TD></TR><TR><TD ALIGN="LEFT"><B>PK</B> pred_id</TD></TR><TR><TD ALIGN="LEFT"><B>FK</B> po_id</TD></TR><TR><TD ALIGN="LEFT">model_name, late_prob</TD></TR></TABLE> >];
+    agent_run [label=< <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5"><TR><TD BGCOLOR="#fef3c7"><B>agent_run</B></TD></TR><TR><TD ALIGN="LEFT"><B>PK</B> run_id</TD></TR><TR><TD ALIGN="LEFT"><B>FK</B> draft_po_id</TD></TR><TR><TD ALIGN="LEFT">status, justification</TD></TR></TABLE> >];
+    agent_tool_call [label=< <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5"><TR><TD BGCOLOR="#fef3c7"><B>agent_tool_call</B></TD></TR><TR><TD ALIGN="LEFT"><B>PK</B> call_id</TD></TR><TR><TD ALIGN="LEFT"><B>FK</B> run_id</TD></TR><TR><TD ALIGN="LEFT">tool, args, result</TD></TR></TABLE> >];
+    document_chunk [label=< <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="5"><TR><TD BGCOLOR="#fef3c7"><B>document_chunk</B></TD></TR><TR><TD ALIGN="LEFT"><B>PK</B> chunk_id</TD></TR><TR><TD ALIGN="LEFT"><B>FK</B> supplier_id</TD></TR><TR><TD ALIGN="LEFT">doc_name, chunk_text, vector(384)</TD></TR></TABLE> >];
+  }
+
+  department -> employee [label="1:N"];
+  department -> purchase_requisition [label="1:N"];
+  employee -> purchase_requisition [label="requests / approves"];
+  employee -> purchase_order [label="creates / approves"];
+  employee -> goods_receipt [label="receives"];
+  supplier -> supplier_contact [label="1:N"];
+  supplier -> supplier_product [label="1:N"];
+  product -> supplier_product [label="1:N"];
+  category -> product [label="1:N"];
+  category -> category [label="parent"];
+  warehouse -> inventory [label="1:N"];
+  product -> inventory [label="1:N"];
+  purchase_requisition -> requisition_item [label="1:N"];
+  product -> requisition_item [label="1:N"];
+  purchase_requisition -> purchase_order [label="0..1 / migration unique"];
+  supplier -> purchase_order [label="1:N"];
+  warehouse -> purchase_order [label="1:N"];
+  purchase_order -> po_item [label="1:N"];
+  product -> po_item [label="1:N"];
+  purchase_order -> goods_receipt [label="1:N"];
+  goods_receipt -> grn_item [label="1:N"];
+  po_item -> grn_item [label="referenced order line"];
+  purchase_order -> invoice [label="1:N"];
+  supplier -> invoice [label="1:N"];
+  invoice -> payment [label="1:N"];
+  purchase_order -> supplier_evaluation [label="0..1"];
+  supplier -> supplier_evaluation [label="1:N"];
+  inventory -> stock_movement [label="1:N"];
+  purchase_order -> prediction [label="1:N"];
+  purchase_order -> agent_run [label="draft_po_id (optional)"];
+  agent_run -> agent_tool_call [label="1:N"];
+  supplier -> document_chunk [label="optional"];
+}

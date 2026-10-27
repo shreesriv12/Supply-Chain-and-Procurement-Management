@@ -1,75 +1,113 @@
 # Supply Chain & Procurement Management
 
-Database-first procure-to-pay system for the E10 SchemaSquad DBMS project. The completed database foundation includes schema, indexes, reporting views, business-rule triggers, procedures, RBAC, query demonstrations, and a deterministic seed generator.
+Database-first procure-to-pay system for the E10 SchemaSquad DBMS project. The repository contains a PostgreSQL schema, indexes, reporting views, triggers/procedures, role grants, sample data, FastAPI endpoints, a React/Vite interface, ML pipelines and optional GenAI modules. Source presence is not runtime proof; use the validation commands below and record actual output.
 
-## Start the database
+## 1. Configure environment (Windows PowerShell)
 
-1. Generate the seed file: `python backend/seed/generate_seed.py`
-2. Start the database and API: `docker compose up -d --build`
-3. Inspect reporting data: `docker compose exec db psql -U scm_admin -d scm -c "SELECT * FROM v_low_stock;"`
+Run from the repository root. Compose reads `.env` in this directory. Keep this file private and never commit live credentials.
 
-Docker runs numbered files in `db/` only when its database volume is first created. To reseed during development, run `docker compose down -v`, generate the seed again, then start the service.
+**Fresh database (no existing PostgreSQL volume):**
 
-## Phase 1 validation
-
-```sql
-SELECT COUNT(*) FROM purchase_order;       -- 3000
-SELECT COUNT(*) FROM stock_movement;       -- 20000
-SELECT * FROM v_low_stock;
-SELECT * FROM v_supplier_performance LIMIT 5;
+```powershell
+$pgPassword = python -c "import secrets; print(secrets.token_hex(32))"
+$jwtSecret = python -c "import secrets; print(secrets.token_hex(32))"
+@("POSTGRES_DB=scm", "POSTGRES_USER=scm_admin", "POSTGRES_PASSWORD=$pgPassword", "JWT_SECRET=$jwtSecret", "GROQ_API_KEY=") | Set-Content -Encoding ascii .env
 ```
 
-The next phase adds database-enforced triggers, procedures, RBAC, query demonstrations, and transaction/concurrency exercises.
+**Existing database created with the previous compose file:** its database password is likely still `scm_admin`. Add `POSTGRES_PASSWORD=scm_admin` to the root `.env` first so the existing DB/API can reconnect, then follow the password-rotation steps in `docs/final_validation.md`. Merely changing the Compose environment does not change a password already stored in an initialized PostgreSQL volume.
 
-## Database logic and demos
+## 2. Start the project
 
-`04_functions_triggers.sql` enforces blocked-supplier, requisition, receipt-tolerance, invoice-match, delivery-scorecard, price-audit, and low-stock rules. `05_procedures.sql` provides the approved workflow entry points. `06_roles.sql` grants least privilege to the application roles; create actual LOGIN users separately and grant them the appropriate application role.
+```powershell
+docker compose config
+docker compose up -d --build
+docker compose ps
+Invoke-RestMethod http://localhost:8000/health
+```
 
-Run the query set with `docker compose exec db psql -U scm_admin -d scm -f /docker-entrypoint-initdb.d/08_queries.sql`. Use the commented two-session blocks in `09_transactions_demo.sql` for the ACID and concurrency viva demos.
+API: `http://localhost:8000` (interactive docs at `/docs`). Web UI: `http://localhost:5173`.
 
-## API
+Docker executes numbered `.sql` files directly in `db/` when the PostgreSQL data directory is initialized for the first time. Files in `db/demo/` are demonstrations and do not run as initialization scripts.
 
-The FastAPI service is served at `http://localhost:8000`; interactive endpoint documentation is at `/docs`. Every data endpoint returns `data`, `executed_sql`, `params`, `duration_ms`, and `rows_affected` for the global SQL panel.
+## 3. Database migration (important)
 
-For development, log in with any generated `employee<N>@schemasquad.test` email and password `demo-password`, then supply the returned bearer token. Change `JWT_SECRET`, replace the development password seed, and provision LOGIN users before deployment.
+The forward migration is `db/10_fixes.sql`. On a fresh database initialization, it runs after `db/07_seed.sql`. For an already initialized database, Docker will not automatically replay it. Apply it without deleting the database volume:
 
-## Web app
+```powershell
+Get-Content db\10_fixes.sql -Raw | docker compose exec -T db psql -U scm_admin -d scm -v ON_ERROR_STOP=1
+```
 
-The React application is served at `http://localhost:5173` by Docker. For standalone frontend work, use `cd frontend`, `npm install`, then `npm run dev`. It provides the dashboard, supplier/product/inventory/requisition/order/receipt/invoice/report pages, global SQL query panel, and live schema browser. The browser connects to `http://localhost:8000` by default; set `VITE_API_URL` when deploying it elsewhere.
+Do **not** run `docker compose down -v` for ordinary schema changes; that command deletes the local database volume and its data. Back up data and get explicit approval before any destructive reset.
 
-## ML training
+## 4. Check views and seeded data
 
-After the database is seeded, train the models from the API container:
+```powershell
+docker compose exec -T db psql -U scm_admin -d scm -c "SELECT COUNT(*) AS purchase_orders FROM purchase_order;"
+docker compose exec -T db psql -U scm_admin -d scm -c "SELECT COUNT(*) AS stock_movements FROM stock_movement;"
+docker compose exec -T db psql -U scm_admin -d scm -c "SELECT * FROM v_low_stock LIMIT 10;"
+docker compose exec -T db psql -U scm_admin -d scm -c "SELECT * FROM v_supplier_performance LIMIT 5;"
+docker compose exec -T db psql -U scm_admin -d scm -c "SELECT * FROM v_po_summary LIMIT 5;"
+docker compose exec -T db psql -U scm_admin -d scm -c "SELECT * FROM v_pending_payments LIMIT 5;"
+docker compose exec -T db psql -U scm_admin -d scm -c "SELECT * FROM v_spend_by_category LIMIT 5;"
+```
 
-`docker compose exec api python -m app.ml.train_late`
+Treat counts shown by your own database as the real results. The generation script can prepare seed SQL, but do not regenerate `db/07_seed.sql` unless you intend to use it for a future clean initialization.
 
-`docker compose exec api python -m app.ml.train_forecast`
+## 5. SQL demonstration files
 
-Each script uses a time-based split and writes a `joblib` model plus JSON metrics under `backend/app/ml/models/`. The **ML insights** page then exposes late-risk predictions and forecast-driven reorder suggestions.
+Run the reporting query set with:
 
-### Synthetic and real-data evaluation
+```powershell
+docker compose exec -T db psql -U scm_admin -d scm -f /docker-entrypoint-initdb.d/demo/08_queries.sql
+```
 
-The live database stays on the deterministic synthetic seed because it has a complete, internally consistent procure-to-pay lifecycle. Real data is used as a separate, reproducible ML evaluation source:
+`db/demo/09_transactions_demo.sql` contains commented two-session examples. Follow its instructions in separate terminal sessions; comments alone do not demonstrate that a transaction test was executed.
 
-- **DataCo Supply Chain**: real late-delivery-risk classification.
-- **M5 Forecasting Accuracy**: retail demand forecasting.
-- **Olist**: external order, product, seller, payment, and delivery data available for analysis; it is not forced into the internal procurement workflow because it has a different marketplace data model.
+## 6. API and authentication
 
-Profile the locally added files with `python backend/seed/inspect_real_datasets.py`. Train external models with `python -m app.ml.train_real_data --dataset all` from `backend/`; reduce M5 runtime with `--m5-series 100` or DataCo runtime with `--dataco-rows 20000`. Metrics and model artifacts are saved beside the existing synthetic-data models.
+For development, the seed generator creates users named `employee<N>@schemasquad.test` with the demo password `demo-password`. Newly generated seeds use salted PBKDF2-SHA256 hashes. The login code supports legacy SHA-256 seed hashes and upgrades them after successful login. Change demo credentials before any deployment; the synthetic credentials are not production identities.
 
-## Groq GenAI
+The SQL utility returns the query text, parameter values, duration, affected-row count and result for ordinary API queries. Use the UI SQL panel to capture a real request and its actual result. Some AI/RAG response paths still need separate runtime verification before their SQL-panel metadata can be treated as real execution evidence.
 
-Set `GROQ_API_KEY` in your shell or a local `.env` file (which is ignored by Git), then start the stack with `docker compose up --build`. The API uses the OpenAI Python client configured for Groq's compatible endpoint and model `openai/gpt-oss-20b` by default. Override it with `GROQ_MODEL` if needed.
+## 7. Python tests
 
-The **Ask Data** page generates and validates one `SELECT` query against reporting views only, then executes it as `nl_readonly` with a timeout and a forced row limit. The **Procurement agent** logs tool calls and can create only `DRAFT` POs for manager approval. The worker listens for `low_stock` notifications and follows the same approval-only path. **Policy Q&A** indexes plain-text policy documents into pgvector and answers from retrieved chunks. It uses a lightweight built-in embedding fallback by default; optionally install `sentence-transformers` for MiniLM semantic embeddings.
+```powershell
+$env:JWT_SECRET = "test-only-secret-for-unit-tests"
+python -m pip install -r backend\requirements.txt
+$env:PYTHONPATH = "$PWD\backend"
+python -m pytest -q backend\tests
+```
 
-Run the guardrail tests with `docker compose exec api pytest backend/tests/test_nl2sql.py`.
+For ML and SQL-guardrail checks with a running stack:
 
-## Documentation and viva
+```powershell
+docker compose exec api python -m app.ml.train_late
+docker compose exec api python -m app.ml.train_forecast
+docker compose exec api python -m pytest backend/tests/test_nl2sql.py
+```
+
+Report only actual output and metrics.
+
+## 8. Standalone frontend build
+
+```powershell
+Push-Location frontend
+npm install
+npm run build
+Pop-Location
+```
+
+Set `VITE_API_URL` if the browser must reach an API at a different origin. The default is `http://localhost:8000/api`.
+
+## 9. AI / ML
+
+The ML scripts write model artifacts and JSON metrics under `backend/app/ml/models/` when training succeeds. Capture actual metrics after running the scripts; do not copy sample or estimated scores into the academic report. GenAI features require a valid `GROQ_API_KEY`; their behavior must be tested separately from core procurement workflows.
+
+## 10. Documentation
 
 - [Normalization and keys](docs/normalization.md)
 - [ER/EER model description](docs/er_description.md)
 - [Report outline](docs/report_outline.md)
-- [Eight-minute demonstration script](docs/demo_script.md)
-
-For a clean first run after changing database initialization files, use `docker compose down -v`, regenerate `db/07_seed.sql`, then start the stack again. This removes the local Docker database volume only; do not run it if you need to preserve local records.
+- [Demo script](docs/demo_script.md)
+- [Implementation gap audit](docs/implementation_gap_audit.md)
+- [Final validation runbook](docs/final_validation.md)

@@ -7,7 +7,7 @@ router = APIRouter(prefix="/suppliers", tags=["suppliers"])
 
 @router.get("")
 def list_suppliers(search: str | None = Query(default=None), user: dict = Depends(current_user)):
-    return run_sql("SELECT supplier_id, name, gstin, email, phone, city, country, status, rating, created_at FROM supplier WHERE (%s IS NULL OR name ILIKE '%%' || %s || '%%') ORDER BY name", [search, search], app_role=user["role"])
+    return run_sql("SELECT supplier_id, name, gstin, email, phone, city, country, status, rating, created_at FROM supplier WHERE (%s::text IS NULL OR name ILIKE '%%' || %s || '%%') ORDER BY name", [search, search], app_role=user["role"])
 
 @router.post("")
 def create_supplier(item: SupplierIn, user: dict = Depends(current_user)):

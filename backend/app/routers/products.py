@@ -6,7 +6,7 @@ router = APIRouter(prefix="/products", tags=["products"])
 
 @router.get("")
 def list_products(search: str | None = Query(default=None), user: dict = Depends(current_user)):
-    return run_sql("SELECT p.*, c.name AS category_name FROM product p JOIN category c USING (category_id) WHERE (%s IS NULL OR p.name ILIKE '%%' || %s || '%%' OR p.sku ILIKE '%%' || %s || '%%') ORDER BY p.name", [search, search, search], app_role=user["role"])
+    return run_sql("SELECT p.*, c.name AS category_name FROM product p JOIN category c USING (category_id) WHERE (%s::text IS NULL OR p.name ILIKE '%%' || %s || '%%' OR p.sku ILIKE '%%' || %s || '%%') ORDER BY p.name", [search, search, search], app_role=user["role"])
 @router.post("")
 def create_product(item: ProductIn, user: dict = Depends(current_user)):
     return run_sql("INSERT INTO product (sku,name,category_id,unit,std_cost) VALUES (%s,%s,%s,%s,%s) RETURNING *", list(item.model_dump().values()), app_role=user["role"])

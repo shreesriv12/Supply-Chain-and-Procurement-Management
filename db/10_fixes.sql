@@ -1,17 +1,22 @@
 BEGIN;
 
+-- The original CHECK prevented the documented 105% receiving tolerance.
+ALTER TABLE po_item DROP CONSTRAINT IF EXISTS po_item_qty_received_check;
+ALTER TABLE po_item DROP CONSTRAINT IF EXISTS chk_po_item_received_nonnegative;
+ALTER TABLE po_item ADD CONSTRAINT chk_po_item_received_nonnegative CHECK (qty_received >= 0);
+
 -- idempotent receipts
 ALTER TABLE goods_receipt ADD COLUMN IF NOT EXISTS ref_no VARCHAR(40);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_grn_po_ref ON goods_receipt(po_id, ref_no) WHERE ref_no IS NOT NULL;
 
 -- shared three-way-match test (2% tolerance)
-CREATE OR REPLACE FUNCTION fn_three_way_ok(p_po INT, p_amount NUMERIC) RETURNS BOOLEAN
+CREATE OR REPLACE FUNCTION fn_three_way_ok(p_po_id INT, p_amount NUMERIC) RETURNS BOOLEAN
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE((
     SELECT abs(p_amount - po.total_amount) <= po.total_amount * 0.02
        AND (SELECT COALESCE(SUM(LEAST(qty_received, qty_ordered) * unit_price), 0)
             FROM po_item WHERE po_id = po.po_id) >= po.total_amount * 0.98
-    FROM purchase_order po WHERE po.po_id = p_po), FALSE)
+    FROM purchase_order po WHERE po.po_id = p_po_id), FALSE)
 $$;
 
 CREATE OR REPLACE FUNCTION fn_match_invoice() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
@@ -39,7 +44,7 @@ BEGIN
   FROM po_item WHERE po_id = NEW.po_id AND line_no = NEW.po_line_no FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'PO line (%, %) does not exist', NEW.po_id, NEW.po_line_no; END IF;
   IF NEW.qty_received + NEW.qty_rejected <= 0 THEN RAISE EXCEPTION 'Receipt line must have a quantity'; END IF;
-  IF prev + NEW.qty_received > CEIL(ordered_qty * 1.05) THEN
+  IF prev + NEW.qty_received > FLOOR(ordered_qty * 1.05) THEN
     RAISE EXCEPTION 'Receipt exceeds the 5%% tolerance for PO %, line %', NEW.po_id, NEW.po_line_no;
   END IF;
   RETURN NEW;
@@ -211,5 +216,159 @@ GRANT SELECT ON v_low_stock, v_supplier_performance, v_po_summary, v_pending_pay
 GRANT INSERT ON prediction TO app_procurement;
 GRANT INSERT ON audit_log TO app_procurement, app_finance;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_procurement, app_warehouse, app_finance;
+
+
+
+-- Enforce approver authorization and limits on both direct INSERT and UPDATE paths.
+CREATE OR REPLACE FUNCTION fn_check_po_approval() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE approver_role TEXT; approver_limit NUMERIC;
+BEGIN
+  IF NEW.status IN ('APPROVED','SENT','PARTIAL','RECEIVED','CLOSED') THEN
+    SELECT role, approval_limit INTO approver_role, approver_limit
+    FROM employee WHERE emp_id = NEW.approved_by;
+    IF approver_role IS NULL OR approver_role NOT IN ('admin','procurement_mgr') THEN
+      RAISE EXCEPTION 'PO needs an authorized manager/admin approver';
+    END IF;
+    IF approver_role <> 'admin' AND NEW.total_amount > approver_limit THEN
+      RAISE EXCEPTION 'PO total % exceeds approver limit %', NEW.total_amount, approver_limit;
+    END IF;
+  END IF;
+  RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS trg_po_approval ON purchase_order;
+CREATE TRIGGER trg_po_approval BEFORE INSERT OR UPDATE OF status, approved_by, total_amount
+ON purchase_order FOR EACH ROW EXECUTE FUNCTION fn_check_po_approval();
+
+-- Block direct approval of requisitions by a requester or unauthorized employee.
+CREATE OR REPLACE FUNCTION fn_check_req_approval() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE approver_role TEXT;
+BEGIN
+  IF NEW.status = 'APPROVED'
+     AND (TG_OP = 'INSERT' OR OLD.status IS DISTINCT FROM 'APPROVED'
+          OR OLD.approved_by IS DISTINCT FROM NEW.approved_by) THEN
+    SELECT role INTO approver_role FROM employee WHERE emp_id = NEW.approved_by;
+    IF approver_role IS NULL OR approver_role NOT IN ('admin','procurement_mgr') THEN
+      RAISE EXCEPTION 'Requisition needs an authorized manager/admin approver';
+    END IF;
+    IF NEW.approved_by = NEW.requested_by THEN
+      RAISE EXCEPTION 'Self-approval is not allowed';
+    END IF;
+  END IF;
+  RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS trg_req_approval ON purchase_requisition;
+CREATE TRIGGER trg_req_approval BEFORE INSERT OR UPDATE OF status, approved_by
+ON purchase_requisition FOR EACH ROW EXECUTE FUNCTION fn_check_req_approval();
+
+-- Keep received quantities controlled by the receipt trigger, including direct SQL.
+CREATE OR REPLACE FUNCTION fn_guard_qty_received_update() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.qty_received <> 0 THEN
+      RAISE EXCEPTION 'New PO lines must start with qty_received = 0; use the goods-receipt workflow';
+    END IF;
+    RETURN NEW;
+  END IF;
+  IF current_user NOT IN ('scm_admin','postgres') THEN
+    RAISE EXCEPTION 'qty_received is maintained by the goods-receipt workflow';
+  END IF;
+  IF NEW.qty_received > FLOOR(NEW.qty_ordered * 1.05) THEN
+    RAISE EXCEPTION 'Received quantity exceeds the allowed 105%% of ordered quantity';
+  END IF;
+  RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS trg_po_item_qty_received_guard ON po_item;
+CREATE TRIGGER trg_po_item_qty_received_guard BEFORE INSERT OR UPDATE OF qty_received ON po_item
+FOR EACH ROW EXECUTE FUNCTION fn_guard_qty_received_update();
+
+-- Rejected-only receipt lines must not create an invalid zero-quantity stock movement.
+CREATE OR REPLACE FUNCTION fn_apply_grn_item() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE wh INT; rdate DATE; prod INT; all_received BOOLEAN;
+BEGIN
+  SELECT warehouse_id, received_date INTO wh, rdate FROM goods_receipt WHERE grn_id = NEW.grn_id;
+  SELECT product_id INTO prod FROM po_item WHERE po_id = NEW.po_id AND line_no = NEW.po_line_no;
+  UPDATE po_item SET qty_received = qty_received + NEW.qty_received
+  WHERE po_id = NEW.po_id AND line_no = NEW.po_line_no;
+  INSERT INTO inventory(warehouse_id, product_id, qty_on_hand)
+  VALUES (wh, prod, NEW.qty_received)
+  ON CONFLICT (warehouse_id, product_id)
+  DO UPDATE SET qty_on_hand = inventory.qty_on_hand + EXCLUDED.qty_on_hand;
+  IF NEW.qty_received > 0 THEN
+    INSERT INTO stock_movement(warehouse_id, product_id, movement_type, qty, moved_at, ref_type, ref_id)
+    VALUES (wh, prod, 'IN', NEW.qty_received, rdate::timestamp, 'GRN', NEW.grn_id);
+  END IF;
+  SELECT bool_and(qty_received >= qty_ordered) INTO all_received
+  FROM po_item WHERE po_id = NEW.po_id;
+  UPDATE purchase_order
+  SET status = CASE WHEN all_received THEN 'RECEIVED' ELSE 'PARTIAL' END
+  WHERE po_id = NEW.po_id AND status NOT IN ('CANCELLED','CLOSED');
+  RETURN NEW;
+END $$;
+
+-- A posted receipt is immutable: corrections require an explicit compensating operation.
+CREATE OR REPLACE FUNCTION fn_grn_item_immutable() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION 'Posted receipt lines are immutable; use a compensating correction';
+END $$;
+DROP TRIGGER IF EXISTS trg_grn_item_immutable ON grn_item;
+CREATE TRIGGER trg_grn_item_immutable BEFORE UPDATE OR DELETE ON grn_item
+FOR EACH ROW EXECUTE FUNCTION fn_grn_item_immutable();
+
+-- Keep the PO price total correct if a draft line is inserted, deleted, or moved.
+CREATE OR REPLACE FUNCTION fn_po_total() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE old_po INT; new_po INT;
+BEGIN
+  IF TG_OP <> 'INSERT' THEN old_po := OLD.po_id; END IF;
+  IF TG_OP <> 'DELETE' THEN new_po := NEW.po_id; END IF;
+  IF old_po IS NOT NULL THEN
+    UPDATE purchase_order SET total_amount = COALESCE(
+      (SELECT SUM(qty_ordered * unit_price) FROM po_item WHERE po_id = old_po), 0)
+    WHERE po_id = old_po;
+  END IF;
+  IF new_po IS NOT NULL AND new_po IS DISTINCT FROM old_po THEN
+    UPDATE purchase_order SET total_amount = COALESCE(
+      (SELECT SUM(qty_ordered * unit_price) FROM po_item WHERE po_id = new_po), 0)
+    WHERE po_id = new_po;
+  END IF;
+  RETURN NULL;
+END $$;
+DROP TRIGGER IF EXISTS trg_po_item_total ON po_item;
+CREATE TRIGGER trg_po_item_total AFTER INSERT OR DELETE OR UPDATE OF po_id, line_no, product_id, qty_ordered, unit_price
+ON po_item FOR EACH ROW EXECUTE FUNCTION fn_po_total();
+
+-- PO line definitions may change only while a PO remains a draft. Receipt-driven
+-- qty_received updates are intentionally not listed in this trigger's UPDATE OF.
+CREATE OR REPLACE FUNCTION fn_po_line_draft_only() RETURNS trigger
+LANGUAGE plpgsql AS $$
+DECLARE old_status TEXT; new_status TEXT;
+BEGIN
+  IF TG_OP <> 'INSERT' THEN
+    SELECT status INTO old_status FROM purchase_order WHERE po_id = OLD.po_id FOR UPDATE;
+    IF old_status IS DISTINCT FROM 'DRAFT' THEN
+      RAISE EXCEPTION 'PO lines can be edited only while the PO is DRAFT';
+    END IF;
+  END IF;
+  IF TG_OP <> 'DELETE' THEN
+    SELECT status INTO new_status FROM purchase_order WHERE po_id = NEW.po_id FOR UPDATE;
+    IF new_status IS DISTINCT FROM 'DRAFT' THEN
+      RAISE EXCEPTION 'PO lines can be edited only while the PO is DRAFT';
+    END IF;
+  END IF;
+  IF TG_OP = 'DELETE' THEN RETURN OLD; ELSE RETURN NEW; END IF;
+END $$;
+DROP TRIGGER IF EXISTS trg_po_line_draft_only ON po_item;
+CREATE TRIGGER trg_po_line_draft_only BEFORE INSERT OR DELETE OR UPDATE OF po_id, line_no, product_id, qty_ordered, unit_price
+ON po_item FOR EACH ROW EXECUTE FUNCTION fn_po_line_draft_only();
+
+-- One procurement request must not be converted into multiple purchase orders.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_purchase_order_one_per_requisition
+ON purchase_order(req_id) WHERE req_id IS NOT NULL;
+
 
 COMMIT;
