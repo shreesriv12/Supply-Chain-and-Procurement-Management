@@ -419,14 +419,15 @@ CREATE TABLE agent_run (
     triggered_by TEXT NOT NULL,
     goal TEXT NOT NULL,
 
-    status VARCHAR(20) NOT NULL DEFAULT 'RUNNING'
-        CHECK (status IN (
-            'RUNNING',
-            'AWAITING_APPROVAL',
-            'APPROVED',
-            'REJECTED',
-            'FAILED'
-        )),
+  status VARCHAR(20) NOT NULL DEFAULT 'RUNNING'
+    CHECK (status IN (
+        'RUNNING',
+        'AWAITING_APPROVAL',
+        'APPROVED',
+        'REJECTED',
+        'FAILED',
+        'NO_ACTION_REQUIRED'
+    )),
 
     draft_po_id INT REFERENCES purchase_order(po_id),
     justification TEXT,

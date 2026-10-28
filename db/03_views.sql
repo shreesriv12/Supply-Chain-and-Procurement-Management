@@ -39,6 +39,7 @@ SELECT
         (
             AVG(
                 CASE
+                    WHEN se.eval_id IS NULL THEN NULL
                     WHEN se.on_time THEN 1.0
                     ELSE 0.0
                 END
@@ -47,10 +48,13 @@ SELECT
         2
     ) AS on_time_rate_pct,
 
-    ROUND(AVG(se.quality_score), 2) AS avg_quality_score,
+    ROUND(
+        AVG(se.quality_score),
+        2
+    ) AS avg_quality_score,
 
     ROUND(
-        COALESCE(AVG(se.days_late), 0)::NUMERIC,
+        AVG(se.days_late)::NUMERIC,
         2
     ) AS avg_days_late
 
@@ -128,8 +132,10 @@ SELECT
 
     po.po_id,
 
-    COALESCE(payments.paid_amount, 0)::NUMERIC(14,2)
-        AS paid_amount,
+    COALESCE(
+        payments.paid_amount,
+        0
+    )::NUMERIC(14,2) AS paid_amount,
 
     (
         i.amount - COALESCE(payments.paid_amount, 0)
@@ -165,8 +171,9 @@ SELECT
 
     DATE_TRUNC('month', po.order_date)::DATE AS month,
 
-    SUM(pi.qty_ordered * pi.unit_price)::NUMERIC(16,2)
-        AS spend,
+    SUM(
+        pi.qty_ordered * pi.unit_price
+    )::NUMERIC(16,2) AS spend,
 
     COUNT(DISTINCT po.po_id) AS po_count
 

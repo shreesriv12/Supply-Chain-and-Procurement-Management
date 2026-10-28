@@ -22,13 +22,29 @@ export default function Schema({ onQuery }) {
         setColumns(r.data);
         onQuery(r);
       });
+    } else {
+      setColumns([]);
     }
   }, [selected]);
 
+  // Main ER diagram served by the backend API
   const diagramUrl = `${API}/schema/er-diagram`;
 
-  // Second ER diagram stored in the project's docs folder
-  const secondDiagramUrl = '/docs/er_diagram_extra.png';
+  // Additional ER diagram served from the frontend public folder
+  const secondDiagramUrl = '/docs/er_diagram_extra.svg';
+
+  const diagramStyle = {
+    display: 'block',
+    width: '100%',
+    height: 'auto',
+    maxHeight: '680px',
+    objectFit: 'contain',
+    objectPosition: 'top',
+    margin: '16px 0',
+    border: '1px solid #eaecf0',
+    borderRadius: '8px',
+    background: '#fff'
+  };
 
   return (
     <section>
@@ -44,6 +60,7 @@ export default function Schema({ onQuery }) {
 
       <div className="schema-grid">
         <article className="er">
+          {/* Main ER Diagram */}
           <h2>Core relationship map</h2>
           <p>Procure-to-pay entity relationship map</p>
 
@@ -56,18 +73,7 @@ export default function Schema({ onQuery }) {
               src={diagramUrl}
               alt="Complete Supply Chain and Procurement Management ER diagram"
               loading="lazy"
-              style={{
-                display: 'block',
-                width: '100%',
-                height: 'auto',
-                maxHeight: '680px',
-                objectFit: 'contain',
-                objectPosition: 'top',
-                margin: '16px 0',
-                border: '1px solid #eaecf0',
-                borderRadius: '8px',
-                background: '#fff'
-              }}
+              style={diagramStyle}
             />
           </a>
 
@@ -81,23 +87,55 @@ export default function Schema({ onQuery }) {
             </a>
           </p>
 
+          <p>
+            <a
+              href={diagramUrl}
+              download="er_diagram.svg"
+            >
+              Download the complete ER diagram (SVG)
+            </a>
+          </p>
+
           <hr />
 
+          {/* Additional ER Diagram */}
           <h2>Additional ER diagram</h2>
+          <p>Additional procure-to-pay ER model</p>
+
+          <a
+            href={secondDiagramUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <img
+              src={secondDiagramUrl}
+              alt="Additional Supply Chain and Procurement Management ER diagram"
+              loading="lazy"
+              style={diagramStyle}
+            />
+          </a>
+
           <p>
-            Download the second ER diagram from the docs folder.
+            <a
+              href={secondDiagramUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open the second ER diagram (SVG)
+            </a>
           </p>
 
           <p>
             <a
               href={secondDiagramUrl}
-              download="er_diagram_extra.png"
+              download="er_diagram_extra.svg"
             >
-              Download the second ER diagram (PNG)
+              Download the second ER diagram (SVG)
             </a>
           </p>
         </article>
 
+        {/* Database Table Browser */}
         <article>
           <h2>Table browser</h2>
 

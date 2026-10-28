@@ -1,4 +1,3 @@
-sql
 -- Supply Chain and Procurement Management
 -- Performance indexes
 -- Assumes db/01_schema.sql has already been executed.

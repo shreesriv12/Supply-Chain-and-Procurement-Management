@@ -370,5 +370,20 @@ ON po_item FOR EACH ROW EXECUTE FUNCTION fn_po_line_draft_only();
 CREATE UNIQUE INDEX IF NOT EXISTS uq_purchase_order_one_per_requisition
 ON purchase_order(req_id) WHERE req_id IS NOT NULL;
 
+-- Keep agent_run status constraint consistent with the core schema.
+ALTER TABLE public.agent_run
+    DROP CONSTRAINT IF EXISTS agent_run_status_check;
 
+ALTER TABLE public.agent_run
+    ADD CONSTRAINT agent_run_status_check
+    CHECK (
+        status IN (
+            'RUNNING',
+            'AWAITING_APPROVAL',
+            'APPROVED',
+            'REJECTED',
+            'FAILED',
+            'NO_ACTION_REQUIRED'
+        )
+    );
 COMMIT;
