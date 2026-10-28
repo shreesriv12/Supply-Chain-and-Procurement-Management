@@ -1,6 +1,9 @@
 """Raw-SQL database layer with per-request SQL-panel metadata."""
 from __future__ import annotations
+from pathlib import Path
+from dotenv import load_dotenv
 
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 import os
 from time import perf_counter
 from typing import Any, Iterable
