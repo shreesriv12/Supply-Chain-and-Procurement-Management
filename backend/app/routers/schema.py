@@ -8,7 +8,7 @@ router = APIRouter(prefix="/schema", tags=["schema"])
 
 @router.get("/er-diagram", include_in_schema=False)
 def er_diagram():
-    diagram = Path(__file__).resolve().parents[3] / "docs" / "er_diagram.svg"
+    diagram = Path(__file__).resolve().parents[2] / "docs" / "er_diagram.svg"
     return FileResponse(diagram, media_type="image/svg+xml", filename="er_diagram.svg")
 
 @router.get("/tables")
