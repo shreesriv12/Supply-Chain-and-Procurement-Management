@@ -1,0 +1,21 @@
+* [33m08a2745[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mclean-main[m[33m)[m fix: improve procurement agent, ML insights, and reporting
+[31m|[m *   [33mc5412af[m[33m ([m[1;31morigin/main[m[33m)[m Merge pull request #2 from shreesriv12/clean-main
+[31m|[m [32m|[m[31m\[m  
+[31m|[m [32m|[m[31m/[m  
+[31m|[m[31m/[m[32m|[m   
+* [32m|[m [33mdc4fda5[m[33m ([m[1;31morigin/clean-main[m[33m)[m Stop tracking local environment secrets
+* [32m|[m [33m07f682e[m fix: resolve PostgreSQL authentication and local development setup
+[32m|[m[32m/[m  
+*   [33m7315500[m Merge branch 'main' of https://github.com/shreesriv12/Supply-Chain-and-Procurement-Management into clean-main
+[34m|[m[35m\[m  
+[34m|[m *   [33mf4a958e[m Merge pull request #1 from shreesriv12/clean-main
+[34m|[m [36m|[m[1;31m\[m  
+* [36m|[m [1;31m|[m [33m417a183[m added frontend crud controls
+[1;31m|[m [36m|[m[1;31m/[m  
+[1;31m|[m[1;31m/[m[36m|[m   
+* [36m|[m [33m3ba822e[m Harden procurement workflows and complete validation
+[36m|[m[36m/[m  
+* [33mb34bf25[m Initial clean project commit
+* [33m873704a[m[33m ([m[1;32mmain[m[33m, [m[1;32mbackup-before-cleanup[m[33m)[m fix schema
+* [33m908db5b[m sql integration
+* [33m8c16820[m feat: add real dataset training and hybrid ML evaluation pipeline
